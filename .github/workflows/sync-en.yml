@@ -1,0 +1,44 @@
+name: sync-en
+
+# Mirror the English page to eggs.kanepajs.eu. The source of truth is the public
+# olas repo (https://github.com/akanepajs/olas): its daily scrape rebuilds
+# index_en.html at 05:30 UTC. This job fetches that file and republishes it here,
+# so there is no second scrape and no cross-repo credential is needed.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC, after olas's 05:30 scrape + commit
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Fetch English page from the olas repo
+        run: |
+          mkdir -p site
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/akanepajs/olas/main/index_en.html" -o site/index.html
+          test -s site/index.html
+          echo "eggs.kanepajs.eu" > site/CNAME
+          : > site/.nojekyll
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
